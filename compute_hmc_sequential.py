@@ -82,23 +82,7 @@ def log_session_start():
     logging.info(f"{separator}")
 
 
-def create_compute_full_json():
-    """Create the Compute_Full.json file with the required content."""
-    json_content = {
-        "Targets": ["/redfish/v1/Chassis/HGX_Chassis_0"]
-    }
-    
-    json_file = "Compute_Full.json"
-    
-    try:
-        with open(json_file, 'w') as f:
-            json.dump(json_content, f, indent=2)
-        
-        log_print(f"✓ Created {json_file}")
-        return json_file
-    
-    except Exception as e:
-        raise HMCUpdateError(f"Failed to create {json_file}: {e}")
+# JSON file creation removed - no longer needed for nvfwupd execution
 
 
 def load_compute_hmc_yaml() -> Tuple[List[Dict], str, str, str]:
@@ -181,7 +165,7 @@ def get_unique_targets(targets: List[Dict]) -> List[Dict]:
 
 
 def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: str, 
-                           json_file: str, package_path: str) -> bool:
+                           package_path: str) -> bool:
     """
     Execute nvfwupd command for a single target.
     Returns True if successful, False otherwise.
@@ -189,9 +173,6 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
     # Extract directory and filename from package path
     package_dir = os.path.dirname(package_path)
     package_filename = os.path.basename(package_path)
-    
-    # Get absolute path to JSON file (needed since we're changing directories)
-    json_file_abs = os.path.abspath(json_file)
     
     cmd = [
         'nvfwupd',
@@ -201,8 +182,6 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
         f'password=\'{password}\'',
         'servertype=GB300',
         'update_fw',
-        '-s',
-        json_file_abs,
         '-p',
         package_filename  # Use only the filename, not full path
     ]
@@ -210,7 +189,6 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
     log_print(f"\n  Executing nvfwupd for {system_name} ({ip})...")
     log_print(f"  Working directory: {package_dir}")
     log_print(f"  Package file: {package_filename}")
-    log_print(f"  JSON file: {json_file_abs}")
     log_print(f"  Command: {' '.join(cmd)}")
     
     try:
@@ -254,13 +232,12 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
         return False
 
 
-def display_summary(targets: List[Dict], package_path: str, json_file: str) -> None:
+def display_summary(targets: List[Dict], package_path: str) -> None:
     """Display update summary before execution."""
     log_print(f"\n" + "=" * 60)
     log_print("GB300 COMPUTE HMC UPDATE SUMMARY")
     log_print("=" * 60)
     log_print(f"YAML file: compute_hmc.yaml")
-    log_print(f"JSON file: {json_file}")
     log_print(f"Package file: {os.path.basename(package_path)}")
     log_print(f"Unique systems to update: {len(targets)}")
     
@@ -299,10 +276,6 @@ def main():
     log_print("=" * 45)
     
     try:
-        # Create Compute_Full.json file
-        log_print("Creating Compute_Full.json...")
-        json_file = create_compute_full_json()
-        
         # Load and parse compute_hmc.yaml file
         log_print("Loading compute_hmc.yaml...")
         targets, username, password, package_path = load_compute_hmc_yaml()
@@ -318,7 +291,7 @@ def main():
         log_print(f"\n✓ Using credentials - Username: {username}")
         
         # Display summary and get confirmation
-        display_summary(unique_targets, package_path, json_file)
+        display_summary(unique_targets, package_path)
         
         if not get_user_confirmation(unique_targets):
             log_print("Operation cancelled by user.")
@@ -341,7 +314,6 @@ def main():
                 username,
                 password,
                 target['SYSTEM_NAME'],
-                json_file,
                 package_path
             )
             

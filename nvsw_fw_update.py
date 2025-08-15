@@ -51,17 +51,11 @@ def setup_logging(package_type: str):
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
     
-    # File handler (append mode)
+    # File handler (append mode) - console output handled by log_print function
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(logging.Formatter('%(message)s'))
-    logger.addHandler(console_handler)
     
     return logger
 
