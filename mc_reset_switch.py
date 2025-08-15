@@ -194,7 +194,10 @@ def execute_bmc_reset(ip: str, username: str, password: str, system_name: str, t
     Returns True if successful, False otherwise.
     """
     base_url = f"https://{ip}"
-    reset_url = f"{base_url}/redfish/v1/Managers/1/Actions/Manager.Reset"
+    
+    # Use the correct manager ID for GB300 switch systems
+    manager_id = "BMC_0"
+    reset_url = f"{base_url}/redfish/v1/Managers/{manager_id}/Actions/Manager.Reset"
     
     headers = {
         'Content-Type': 'application/json',

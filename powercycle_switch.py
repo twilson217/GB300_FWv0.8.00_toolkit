@@ -188,6 +188,51 @@ def get_unique_credentials(targets: List[Dict]) -> Tuple[str, str]:
     return usernames.pop(), passwords.pop()
 
 
+def discover_system_id(ip: str, username: str, password: str, timeout: int = 30) -> str:
+    """
+    Discover the correct System ID for power operations.
+    Returns the system ID or '1' as fallback.
+    """
+    base_url = f"https://{ip}"
+    systems_url = f"{base_url}/redfish/v1/Systems"
+    
+    try:
+        response = requests.get(
+            systems_url,
+            auth=HTTPBasicAuth(username, password),
+            verify=False,
+            timeout=timeout
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Look for Members array containing system references
+            if 'Members' in data and data['Members']:
+                # Extract system ID from first member URL
+                # e.g., "/redfish/v1/Systems/system" -> "system"
+                member_url = data['Members'][0]['@odata.id']
+                system_id = member_url.split('/')[-1]
+                return system_id
+        
+        # Try common alternatives if discovery fails
+        common_ids = ['system', 'System', 'Self', '1']
+        for system_id in common_ids:
+            test_url = f"{base_url}/redfish/v1/Systems/{system_id}"
+            response = requests.get(
+                test_url,
+                auth=HTTPBasicAuth(username, password),
+                verify=False,
+                timeout=timeout
+            )
+            if response.status_code == 200:
+                return system_id
+                
+    except Exception:
+        pass
+    
+    return "1"  # Fallback to default
+
+
 def execute_power_command(ip: str, username: str, password: str, system_name: str, 
                          command: str, timeout: int = 30) -> bool:
     """
@@ -196,7 +241,10 @@ def execute_power_command(ip: str, username: str, password: str, system_name: st
     Returns True if successful, False otherwise.
     """
     base_url = f"https://{ip}"
-    power_url = f"{base_url}/redfish/v1/Systems/1/Actions/ComputerSystem.Reset"
+    
+    # Discover the correct system ID
+    system_id = discover_system_id(ip, username, password, timeout)
+    power_url = f"{base_url}/redfish/v1/Systems/{system_id}/Actions/ComputerSystem.Reset"
     
     headers = {
         'Content-Type': 'application/json',
