@@ -85,10 +85,10 @@ def log_session_start():
 # JSON file creation removed - no longer needed for nvfwupd execution
 
 
-def load_compute_hmc_yaml() -> Tuple[List[Dict], str, str, str]:
+def load_compute_hmc_yaml() -> Tuple[List[Dict], str, str, str, str]:
     """
     Load and parse compute_hmc.yaml file.
-    Returns tuple of (targets, username, password, package_path).
+    Returns tuple of (targets, username, password, package_path, target_platform).
     """
     yaml_file = 'compute_hmc.yaml'
     
@@ -115,15 +115,16 @@ def load_compute_hmc_yaml() -> Tuple[List[Dict], str, str, str]:
     
     # Validate each target has required fields
     for i, target in enumerate(targets):
-        required_fields = ['BMC_IP', 'RF_USERNAME', 'RF_PASSWORD', 'PACKAGE', 'SYSTEM_NAME']
+        required_fields = ['BMC_IP', 'RF_USERNAME', 'RF_PASSWORD', 'PACKAGE', 'SYSTEM_NAME', 'TARGET_PLATFORM']
         for field in required_fields:
             if field not in target:
                 raise HMCUpdateError(f"Target {i+1} in {yaml_file} missing required field: {field}")
     
-    # Extract username, password, and package path (assuming all targets use same values)
+    # Extract username, password, package path, and target platform (assuming all targets use same values)
     username = targets[0]['RF_USERNAME']
     password = targets[0]['RF_PASSWORD']
     package_path = targets[0]['PACKAGE']
+    target_platform = targets[0]['TARGET_PLATFORM']
     
     # Validate consistency across all targets
     for i, target in enumerate(targets):
@@ -133,8 +134,10 @@ def load_compute_hmc_yaml() -> Tuple[List[Dict], str, str, str]:
             raise HMCUpdateError(f"Inconsistent password found in target {i+1}")
         if target['PACKAGE'] != package_path:
             raise HMCUpdateError(f"Inconsistent package path found in target {i+1}")
+        if target['TARGET_PLATFORM'] != target_platform:
+            raise HMCUpdateError(f"Inconsistent target platform found in target {i+1}")
     
-    return targets, username, password, package_path
+    return targets, username, password, package_path, target_platform
 
 
 def validate_package_file(package_path: str) -> None:
@@ -165,30 +168,26 @@ def get_unique_targets(targets: List[Dict]) -> List[Dict]:
 
 
 def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: str, 
-                           package_path: str) -> bool:
+                           package_path: str, target_platform: str) -> bool:
     """
     Execute nvfwupd command for a single target.
     Returns True if successful, False otherwise.
     """
-    # Extract directory and filename from package path
-    package_dir = os.path.dirname(package_path)
-    package_filename = os.path.basename(package_path)
-    
     cmd = [
         'nvfwupd',
         '-t',
         f'ip={ip}',
         f'user={username}',
         f'password=\'{password}\'',
-        'servertype=GB300',
+        f'servertype={target_platform}',
         'update_fw',
         '-p',
-        package_filename  # Use only the filename, not full path
+        f'"{package_path}"'  # Use absolute path in double quotes
     ]
     
     log_print(f"\n  Executing nvfwupd for {system_name} ({ip})...")
-    log_print(f"  Working directory: {package_dir}")
-    log_print(f"  Package file: {package_filename}")
+    log_print(f"  Package file: {package_path}")
+    log_print(f"  Server type: {target_platform}")
     log_print(f"  Command: {' '.join(cmd)}")
     
     try:
@@ -198,7 +197,6 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
             input="Y\n",  # Automatically respond "Y" to confirmation prompt
             capture_output=True,
             text=True,
-            cwd=package_dir,  # Change to package directory
             timeout=1800  # 30 minute timeout
         )
         
@@ -278,7 +276,7 @@ def main():
     try:
         # Load and parse compute_hmc.yaml file
         log_print("Loading compute_hmc.yaml...")
-        targets, username, password, package_path = load_compute_hmc_yaml()
+        targets, username, password, package_path, target_platform = load_compute_hmc_yaml()
         
         # Get unique targets (eliminate duplicates)
         unique_targets = get_unique_targets(targets)
@@ -289,6 +287,7 @@ def main():
         validate_package_file(package_path)
         
         log_print(f"\n✓ Using credentials - Username: {username}")
+        log_print(f"✓ Target platform: {target_platform}")
         
         # Display summary and get confirmation
         display_summary(unique_targets, package_path)
@@ -314,7 +313,8 @@ def main():
                 username,
                 password,
                 target['SYSTEM_NAME'],
-                package_path
+                package_path,
+                target_platform
             )
             
             if success:
