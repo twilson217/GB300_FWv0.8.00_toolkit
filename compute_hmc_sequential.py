@@ -186,6 +186,13 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
     Execute nvfwupd command for a single target.
     Returns True if successful, False otherwise.
     """
+    # Extract directory and filename from package path
+    package_dir = os.path.dirname(package_path)
+    package_filename = os.path.basename(package_path)
+    
+    # Get absolute path to JSON file (needed since we're changing directories)
+    json_file_abs = os.path.abspath(json_file)
+    
     cmd = [
         'nvfwupd',
         '-t',
@@ -195,20 +202,25 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
         'servertype=GB300',
         'update_fw',
         '-s',
-        json_file,
+        json_file_abs,
         '-p',
-        package_path
+        package_filename  # Use only the filename, not full path
     ]
     
     log_print(f"\n  Executing nvfwupd for {system_name} ({ip})...")
+    log_print(f"  Working directory: {package_dir}")
+    log_print(f"  Package file: {package_filename}")
+    log_print(f"  JSON file: {json_file_abs}")
     log_print(f"  Command: {' '.join(cmd)}")
     
     try:
-        # Execute the command and capture output
+        # Execute the command and capture output, with automatic "Y" response
         result = subprocess.run(
             cmd,
+            input="Y\n",  # Automatically respond "Y" to confirmation prompt
             capture_output=True,
             text=True,
+            cwd=package_dir,  # Change to package directory
             timeout=1800  # 30 minute timeout
         )
         
