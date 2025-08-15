@@ -25,22 +25,15 @@ class BMCResetError(Exception):
 
 
 def find_yaml_files(pattern: str) -> List[str]:
-    """Find YAML files matching the pattern in the current directory and subdirectories."""
+    """Find YAML files matching the pattern in the current directory only."""
     yaml_files = []
     
-    # Check current directory
+    # Check current directory only (avoid duplicates from os.walk)
     for file in os.listdir('.'):
         if file.startswith(pattern) and file.endswith('.yaml'):
             yaml_files.append(file)
     
-    # Check subdirectories
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.startswith(pattern) and file.endswith('.yaml'):
-                full_path = os.path.join(root, file)
-                yaml_files.append(full_path)
-    
-    return yaml_files
+    return sorted(yaml_files)
 
 
 def load_yaml_data(file_path: str) -> Dict:
@@ -252,18 +245,28 @@ def get_user_confirmation(targets: List[Dict], switch_ips: Set[str]) -> bool:
     print("\n" + "=" * 60)
     print("READY TO EXECUTE BMC RESETS")
     print("=" * 60)
-    print(f"Total systems to reset: {len(targets)}")
+    
+    # Create unique targets for display
+    unique_targets = {}
+    for target in targets:
+        ip = target['BMC_IP']
+        if ip not in unique_targets:
+            unique_targets[ip] = target
+    
+    unique_target_list = list(unique_targets.values())
+    
+    print(f"Unique systems to reset: {len(unique_target_list)}")
     print(f"Unique IP addresses: {len(switch_ips)}")
     print("\nSystems that will be reset:")
     
-    for target in targets:
+    for target in unique_target_list:
         print(f"  - {target['SYSTEM_NAME']} ({target['BMC_IP']})")
     
-    print(f"\n⚠ WARNING: This will reset the BMC on all {len(targets)} systems!")
+    print(f"\n⚠ WARNING: This will reset the BMC on {len(unique_target_list)} unique systems!")
     print("⚠ This may cause temporary loss of management connectivity.")
     
     while True:
-        choice = input(f"\nDo you want to proceed with resetting {len(targets)} BMCs? (yes/no): ").strip().lower()
+        choice = input(f"\nDo you want to proceed with resetting {len(unique_target_list)} BMCs? (yes/no): ").strip().lower()
         if choice in ['yes', 'y']:
             return True
         elif choice in ['no', 'n']:
@@ -293,15 +296,25 @@ def main():
             print("Operation cancelled by user.")
             return
         
-        # Execute BMC resets
+        # Execute BMC resets (using unique IPs only)
         print(f"\n" + "=" * 60)
         print("EXECUTING BMC RESETS")
         print("=" * 60)
         
-        success_count = 0
-        total_count = len(all_targets)
+        # Create unique targets based on unique IPs
+        unique_targets = {}
+        for target in all_targets:
+            ip = target['BMC_IP']
+            if ip not in unique_targets:
+                unique_targets[ip] = target
         
-        for i, target in enumerate(all_targets, 1):
+        unique_target_list = list(unique_targets.values())
+        success_count = 0
+        total_count = len(unique_target_list)
+        
+        print(f"Executing BMC resets for {total_count} unique IP addresses...")
+        
+        for i, target in enumerate(unique_target_list, 1):
             print(f"[{i}/{total_count}]", end=" ")
             
             success = execute_bmc_reset(

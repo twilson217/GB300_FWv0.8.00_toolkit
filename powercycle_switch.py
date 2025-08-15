@@ -25,22 +25,15 @@ class PowerCycleError(Exception):
 
 
 def find_yaml_files(pattern: str) -> List[str]:
-    """Find YAML files matching the pattern in the current directory and subdirectories."""
+    """Find YAML files matching the pattern in the current directory only."""
     yaml_files = []
     
-    # Check current directory
+    # Check current directory only (avoid duplicates from os.walk)
     for file in os.listdir('.'):
         if file.startswith(pattern) and file.endswith('.yaml'):
             yaml_files.append(file)
     
-    # Check subdirectories
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.startswith(pattern) and file.endswith('.yaml'):
-                full_path = os.path.join(root, file)
-                yaml_files.append(full_path)
-    
-    return yaml_files
+    return sorted(yaml_files)
 
 
 def load_yaml_data(file_path: str) -> Dict:
@@ -275,14 +268,24 @@ def get_user_confirmation(targets: List[Dict], switch_ips: Set[str]) -> bool:
     print("\n" + "=" * 60)
     print("READY TO EXECUTE POWER CYCLE")
     print("=" * 60)
-    print(f"Total systems to power cycle: {len(targets)}")
+    
+    # Create unique targets for display
+    unique_targets = {}
+    for target in targets:
+        ip = target['BMC_IP']
+        if ip not in unique_targets:
+            unique_targets[ip] = target
+    
+    unique_target_list = list(unique_targets.values())
+    
+    print(f"Unique systems to power cycle: {len(unique_target_list)}")
     print(f"Unique IP addresses: {len(switch_ips)}")
     print("\nSystems that will be power cycled:")
     
-    for target in targets:
+    for target in unique_target_list:
         print(f"  - {target['SYSTEM_NAME']} ({target['BMC_IP']})")
     
-    print(f"\n⚠ WARNING: This will power cycle all {len(targets)} systems!")
+    print(f"\n⚠ WARNING: This will power cycle {len(unique_target_list)} unique systems!")
     print("⚠ This operation will:")
     print("  1. Force power off all systems")
     print("  2. Wait 15 seconds")
@@ -290,7 +293,7 @@ def get_user_confirmation(targets: List[Dict], switch_ips: Set[str]) -> bool:
     print("⚠ This may cause data loss if systems are not properly shut down!")
     
     while True:
-        choice = input(f"\nDo you want to proceed with power cycling {len(targets)} systems? (yes/no): ").strip().lower()
+        choice = input(f"\nDo you want to proceed with power cycling {len(unique_target_list)} systems? (yes/no): ").strip().lower()
         if choice in ['yes', 'y']:
             return True
         elif choice in ['no', 'n']:

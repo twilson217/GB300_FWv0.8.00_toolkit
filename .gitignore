@@ -1,0 +1,25 @@
+# Exclude example YAML files
+example yaml/
+
+# Exclude workflow documentation (for now)
+workflow.md
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
