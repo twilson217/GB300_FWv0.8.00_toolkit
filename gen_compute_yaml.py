@@ -11,7 +11,58 @@ import ipaddress
 import subprocess
 import sys
 import yaml
-from typing import List, Tuple, Union, Set
+from typing import List, Tuple, Union, Set, Dict, Optional
+
+
+def extract_existing_values() -> Dict[str, any]:
+    """Extract existing values from YAML files if they exist."""
+    existing_values = {
+        'ip_list': [],
+        'name_list': [],
+        'username': '',
+        'password': '',
+        'firmware_paths': {
+            'bmc': '',
+            'hmc': '',
+            'mcu': ''
+        }
+    }
+    
+    yaml_files = {
+        'bmc': 'compute_bmc.yaml',
+        'hmc': 'compute_hmc.yaml', 
+        'mcu': 'compute_mcu.yaml'
+    }
+    
+    existing_files = []
+    for file_type, filename in yaml_files.items():
+        if os.path.exists(filename):
+            existing_files.append(filename)
+            try:
+                with open(filename, 'r') as f:
+                    data = yaml.safe_load(f)
+                
+                if 'Targets' in data and data['Targets']:
+                    # Extract IPs and system names (use first file found as source)
+                    if not existing_values['ip_list']:
+                        existing_values['ip_list'] = [target.get('BMC_IP', '') for target in data['Targets']]
+                        existing_values['name_list'] = [target.get('SYSTEM_NAME', '') for target in data['Targets']]
+                        existing_values['username'] = data['Targets'][0].get('RF_USERNAME', '')
+                        existing_values['password'] = data['Targets'][0].get('RF_PASSWORD', '')
+                    
+                    # Extract firmware path for this type
+                    if data['Targets']:
+                        package_path = data['Targets'][0].get('PACKAGE', '')
+                        existing_values['firmware_paths'][file_type] = package_path
+            
+            except (yaml.YAMLError, Exception) as e:
+                print(f"Warning: Error reading {filename}: {e}")
+    
+    if existing_files:
+        print(f"Found existing YAML files: {', '.join(existing_files)}")
+        print("Current values will be shown as defaults. Press Enter to keep them, or enter new values to change them.\n")
+    
+    return existing_values
 
 
 def display_intro():
@@ -181,14 +232,22 @@ def parse_system_name_range(name_input: str) -> List[str]:
     return [name_input]
 
 
-def get_ip_addresses() -> List[str]:
+def get_ip_addresses(default_ips: List[str] = None) -> List[str]:
     """Get IP addresses from user input with optional exclusions."""
     while True:
         try:
-            ip_input = input("Enter IP address list (comma separated) or range (e.g., 10.102.112.79-96): ").strip()
-            if not ip_input:
-                print("IP address input cannot be empty. Please try again.")
-                continue
+            # Show default if available
+            if default_ips:
+                default_str = ','.join(default_ips)
+                ip_input = input(f"Enter IP address list (comma separated) or range (e.g., 10.102.112.79-96) [{default_str}]: ").strip()
+                if not ip_input:
+                    print(f"Using existing IP addresses: {default_str}")
+                    return default_ips
+            else:
+                ip_input = input("Enter IP address list (comma separated) or range (e.g., 10.102.112.79-96): ").strip()
+                if not ip_input:
+                    print("IP address input cannot be empty. Please try again.")
+                    continue
             
             ip_list = parse_ip_range(ip_input)
             print(f"Parsed {len(ip_list)} IP addresses: {ip_list[0]} to {ip_list[-1]}")
@@ -212,14 +271,22 @@ def get_ip_addresses() -> List[str]:
             print("Please try again.")
 
 
-def get_system_names() -> List[str]:
+def get_system_names(default_names: List[str] = None) -> List[str]:
     """Get system names from user input with optional exclusions."""
     while True:
         try:
-            name_input = input("Enter system name list (comma separated) or range (e.g., CP-[01-18] or CP-01..CP-18): ").strip()
-            if not name_input:
-                print("System name input cannot be empty. Please try again.")
-                continue
+            # Show default if available
+            if default_names:
+                default_str = ','.join(default_names)
+                name_input = input(f"Enter system name list (comma separated) or range (e.g., CP-[01-18] or CP-01..CP-18) [{default_str}]: ").strip()
+                if not name_input:
+                    print(f"Using existing system names: {default_str}")
+                    return default_names
+            else:
+                name_input = input("Enter system name list (comma separated) or range (e.g., CP-[01-18] or CP-01..CP-18): ").strip()
+                if not name_input:
+                    print("System name input cannot be empty. Please try again.")
+                    continue
             
             name_list = parse_system_name_range(name_input)
             print(f"Parsed {len(name_list)} system names: {name_list[0]} to {name_list[-1]}")
@@ -243,28 +310,56 @@ def get_system_names() -> List[str]:
             print("Please try again.")
 
 
-def get_credentials() -> Tuple[str, str]:
+def get_credentials(default_username: str = '', default_password: str = '') -> Tuple[str, str]:
     """Get username and password from user."""
-    username = input("Enter username: ").strip()
-    while not username:
-        print("Username cannot be empty.")
+    # Get username
+    if default_username:
+        username = input(f"Enter username [{default_username}]: ").strip()
+        if not username:
+            username = default_username
+            print(f"Using existing username: {username}")
+    else:
         username = input("Enter username: ").strip()
+        while not username:
+            print("Username cannot be empty.")
+            username = input("Enter username: ").strip()
     
-    password = input("Enter password: ").strip()
-    while not password:
-        print("Password cannot be empty.")
+    # Get password
+    if default_password:
+        password = input(f"Enter password [{'*' * len(default_password)}]: ").strip()
+        if not password:
+            password = default_password
+            print("Using existing password.")
+    else:
         password = input("Enter password: ").strip()
+        while not password:
+            print("Password cannot be empty.")
+            password = input("Enter password: ").strip()
     
     return username, password
 
 
-def get_firmware_path() -> str:
+def get_firmware_path(existing_paths: Dict[str, str] = None) -> str:
     """Get and validate firmware file path."""
+    # If we have existing paths, try to extract the directory from them
+    default_dir = ''
+    if existing_paths:
+        for file_type, path in existing_paths.items():
+            if path:
+                default_dir = os.path.dirname(path)
+                break
+    
     while True:
-        path = input("Enter absolute path to firmware files directory: ").strip()
-        if not path:
-            print("Path cannot be empty. Please try again.")
-            continue
+        if default_dir:
+            path = input(f"Enter absolute path to firmware files directory [{default_dir}]: ").strip()
+            if not path:
+                path = default_dir
+                print(f"Using existing firmware directory: {path}")
+        else:
+            path = input("Enter absolute path to firmware files directory: ").strip()
+            if not path:
+                print("Path cannot be empty. Please try again.")
+                continue
         
         if not os.path.isabs(path):
             print("Please provide an absolute path.")
@@ -481,11 +576,14 @@ def main():
     display_intro()
     
     try:
-        # Get user inputs
-        ip_list = get_ip_addresses()
-        name_list = get_system_names()
-        username, password = get_credentials()
-        firmware_dir = get_firmware_path()
+        # Extract existing values from YAML files
+        existing_values = extract_existing_values()
+        
+        # Get user inputs (with defaults if available)
+        ip_list = get_ip_addresses(existing_values['ip_list'] if existing_values['ip_list'] else None)
+        name_list = get_system_names(existing_values['name_list'] if existing_values['name_list'] else None)
+        username, password = get_credentials(existing_values['username'], existing_values['password'])
+        firmware_dir = get_firmware_path(existing_values['firmware_paths'])
         
         # Find firmware files
         print("\nSearching for firmware files...")

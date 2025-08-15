@@ -12,7 +12,7 @@ A comprehensive Python toolkit for managing NVIDIA GB300 compute and switch syst
 
 ### System Connectivity Testing
 - **Ping connectivity** testing across all systems
-- **TCP port 80** reachability verification
+- **TCP port 443** reachability verification
 - **Cross-platform support** (Windows, Linux, macOS)
 - **Real-time progress** indicators
 
@@ -29,6 +29,25 @@ A comprehensive Python toolkit for managing NVIDIA GB300 compute and switch syst
 - **Data loss warnings** and safety confirmations
 
 ## 📋 Prerequisites
+
+### Development & Testing Environment
+- **Developed and tested on:** Ubuntu 24.04 with Python 3.12
+- **Assumes:** Python3 is already installed
+
+### Ubuntu Setup
+```bash
+# Install pip
+sudo apt install python3-pip
+
+# Install venv module
+sudo apt install python3.12-venv
+
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate
+```
 
 ### Python Requirements
 ```bash
@@ -108,7 +127,7 @@ python test_switch_reachability.py
 
 **Features:**
 - Ping connectivity testing
-- Optional TCP port 80 testing
+- Optional TCP port 443 testing
 - Real-time progress indicators
 - Comprehensive summary reports
 

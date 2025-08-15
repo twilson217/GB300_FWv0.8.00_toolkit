@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GB300 Compute Reachability Test
-Tests ping and TCP port 80 connectivity to IP addresses from generated YAML files.
+Tests ping and TCP port 443 connectivity to IP addresses from generated YAML files.
 """
 
 import os
@@ -79,7 +79,7 @@ def ping_host(ip_address: str, timeout: int = 3) -> bool:
         return False
 
 
-def test_tcp_port(ip_address: str, port: int = 80, timeout: int = 5) -> bool:
+def test_tcp_port(ip_address: str, port: int = 443, timeout: int = 5) -> bool:
     """
     Test TCP connectivity to a specific port.
     Returns True if connection successful, False otherwise.
@@ -115,7 +115,7 @@ def run_ping_tests(ip_addresses: List[str]) -> Dict[str, bool]:
     return results
 
 
-def run_tcp_tests(ip_addresses: List[str], port: int = 80) -> Dict[str, bool]:
+def run_tcp_tests(ip_addresses: List[str], port: int = 443) -> Dict[str, bool]:
     """Run TCP port connectivity tests for all IP addresses."""
     print(f"\nTesting TCP port {port} connectivity to {len(ip_addresses)} IP addresses...")
     print("=" * 50)
@@ -158,13 +158,13 @@ def display_summary(ping_results: Dict[str, bool], tcp_results: Dict[str, bool] 
         print()
         tcp_success = sum(1 for result in tcp_results.values() if result)
         tcp_total = len(tcp_results)
-        print(f"TCP Port 80 Test Results: {tcp_success}/{tcp_total} successful")
+        print(f"TCP Port 443 Test Results: {tcp_success}/{tcp_total} successful")
         
         if tcp_success < tcp_total:
-            print("Failed TCP port 80 tests:")
+            print("Failed TCP port 443 tests:")
             for ip, result in tcp_results.items():
                 if not result:
-                    print(f"  ✗ {ip}:80")
+                    print(f"  ✗ {ip}:443")
     
     print("=" * 60)
 
@@ -202,8 +202,8 @@ def main():
         ping_success = sum(1 for result in ping_results.values() if result)
         print(f"\nPing test completed: {ping_success}/{len(ip_addresses)} hosts reachable")
         
-        # Ask user if they want to test TCP port 80
-        if not get_user_choice("\nWould you like to test TCP port 80 reachability?"):
+        # Ask user if they want to test TCP port 443
+        if not get_user_choice("\nWould you like to test TCP port 443 reachability?"):
             display_summary(ping_results)
             print("Exiting...")
             return
