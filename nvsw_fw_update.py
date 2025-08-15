@@ -191,6 +191,13 @@ def execute_firmware_update(ip: str, username: str, password: str, system_name: 
     try:
         log_print(f"  Uploading firmware to {system_name} ({ip})...", end=" ", flush=True)
         
+        # Log request details
+        log_print(f"\n    Request URL: {update_url}")
+        log_print(f"    Request Headers: {headers}")
+        log_print(f"    Request Method: POST")
+        log_print(f"    Authentication: Basic (user: {username})")
+        log_print(f"    Firmware File: {os.path.basename(package_path)}")
+        
         # Open and read the firmware file
         with open(package_path, 'rb') as firmware_file:
             response = requests.post(
@@ -202,16 +209,34 @@ def execute_firmware_update(ip: str, username: str, password: str, system_name: 
                 timeout=timeout
             )
         
+        # Log comprehensive response details
+        log_print(f"\n    HTTP Response Details:")
+        log_print(f"    Status Code: {response.status_code}")
+        log_print(f"    Status Reason: {response.reason}")
+        log_print(f"    Response Headers: {dict(response.headers)}")
+        log_print(f"    Response URL: {response.url}")
+        log_print(f"    Response Time: {response.elapsed.total_seconds():.2f} seconds")
+        
+        # Log response content
+        if response.text:
+            log_print(f"    Response Body:")
+            try:
+                # Try to parse as JSON for prettier output
+                response_json = response.json()
+                import json
+                log_print(f"    {json.dumps(response_json, indent=6)}")
+            except:
+                # If not JSON, log as plain text
+                for line in response.text.splitlines():
+                    log_print(f"    {line}")
+        else:
+            log_print(f"    Response Body: (empty)")
+        
         if response.status_code in [200, 202, 204]:
-            log_print("✓ SUCCESS")
+            log_print("    Result: ✓ SUCCESS")
             return True
         else:
-            log_print(f"✗ FAILED (HTTP {response.status_code})")
-            try:
-                error_data = response.json()
-                log_print(f"    Error: {error_data}")
-            except:
-                log_print(f"    Response: {response.text}")
+            log_print(f"    Result: ✗ FAILED (HTTP {response.status_code})")
             return False
     
     except requests.exceptions.Timeout:
