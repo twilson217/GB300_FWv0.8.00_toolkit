@@ -386,16 +386,21 @@ def find_firmware_files(firmware_dir: str) -> Tuple[str, str, str]:
     hmc_file = None
     mcu_file = None
     
+    # Define exact expected filenames
+    expected_files = {
+        'bmc': 'nvfw_GB300-P4058-0301_0042_250719.1.0_custom_prod-signed.fwpkg',
+        'hmc': 'nvfw_GB300-P4059-0301_0041_250719.1.1_custom_prod-signed.fwpkg',
+        'mcu': 'nvfw_GB300-P4058-0301_0042_250709.1.0_custom_prod-signed.fwpkg'
+    }
+    
     for file in files:
         if file.endswith('.fwpkg'):
-            file_lower = file.lower()
-            if 'p4058' in file_lower and any(x in file_lower for x in ['0042', '42']):
-                if bmc_file is None:
-                    bmc_file = file
-                elif mcu_file is None:
-                    mcu_file = file
-            elif 'p4059' in file_lower and any(x in file_lower for x in ['0041', '41']):
+            if file == expected_files['bmc']:
+                bmc_file = file
+            elif file == expected_files['hmc']:
                 hmc_file = file
+            elif file == expected_files['mcu']:
+                mcu_file = file
     
     # If we couldn't auto-detect, let user choose
     fwpkg_files = [f for f in files if f.endswith('.fwpkg')]
@@ -404,6 +409,8 @@ def find_firmware_files(firmware_dir: str) -> Tuple[str, str, str]:
         raise FileNotFoundError("No .fwpkg files found in the specified directory")
     
     if not bmc_file:
+        print(f"\n⚠ WARNING: Expected BMC file not found!")
+        print(f"Expected: {expected_files['bmc']}")
         print(f"\nFound {len(fwpkg_files)} .fwpkg files:")
         for i, file in enumerate(fwpkg_files, 1):
             print(f"{i}. {file}")
@@ -422,6 +429,8 @@ def find_firmware_files(firmware_dir: str) -> Tuple[str, str, str]:
     if not hmc_file:
         remaining_files = [f for f in fwpkg_files if f != bmc_file]
         if remaining_files:
+            print(f"\n⚠ WARNING: Expected HMC file not found!")
+            print(f"Expected: {expected_files['hmc']}")
             print(f"\nRemaining {len(remaining_files)} .fwpkg files:")
             for i, file in enumerate(remaining_files, 1):
                 print(f"{i}. {file}")
@@ -440,6 +449,8 @@ def find_firmware_files(firmware_dir: str) -> Tuple[str, str, str]:
     if not mcu_file:
         remaining_files = [f for f in fwpkg_files if f not in [bmc_file, hmc_file]]
         if remaining_files:
+            print(f"\n⚠ WARNING: Expected MCU file not found!")
+            print(f"Expected: {expected_files['mcu']}")
             print(f"\nRemaining {len(remaining_files)} .fwpkg files:")
             for i, file in enumerate(remaining_files, 1):
                 print(f"{i}. {file}")
