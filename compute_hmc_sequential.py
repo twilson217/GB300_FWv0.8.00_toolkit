@@ -191,7 +191,7 @@ def execute_nvfwupd_command(ip: str, username: str, password: str, system_name: 
         '-t',
         f'ip={ip}',
         f'user={username}',
-        f'password={password}',
+        f'password=\'{password}\'',
         'servertype=GB300',
         'update_fw',
         '-s',
