@@ -1,4 +1,4 @@
-# GB300 System Management Toolkit
+# GB300 Firmare v0.8.00 Toolkit
 
 A comprehensive Python toolkit for managing NVIDIA GB300 compute and switch systems, including YAML configuration generation, connectivity testing, BMC management, and power control operations.
 
