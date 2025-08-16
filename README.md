@@ -64,6 +64,169 @@ pip install -r requirements.txt
 - Network access to GB300 BMCs
 - Valid BMC credentials
 
+## 🚀 Complete Firmware Update Workflow
+
+This section provides a step-by-step guide to update GB300 compute and switch firmware using the toolkit along with the `nvfwupd` command.
+
+### 🔧 Initial Setup
+
+**Start a persistent session** (recommended for long-running operations):
+   ```bash
+   tmux
+   ```
+
+**Activate Python virtual environment**:
+```bash
+source .venv/bin/activate
+```
+
+**Generate YAML configuration files**:
+```bash
+python gen_compute_yaml.py
+python gen_switch_yaml.py
+```
+
+### 💻 Compute Systems Firmware Update
+
+#### Step 1: Update Compute BMC Firmware
+```bash
+nvfwupd -c compute_bmc.yaml update_fw
+```
+
+#### Step 2: Verify BMC Update Success
+```bash
+nvfwupd -c compute_bmc.yaml show_version | grep '^Displaying version info for\|^FW_ERoT_BMC_0'
+```
+**All outputs should show:**
+```
+FW_ERoT_BMC_0                            01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+```
+
+#### Step 3: Activate BMC Firmware (Cold Reset)
+```bash
+nvfwupd -c compute_bmc.yaml activate_fw -c RESET_COLD
+```
+
+#### Step 4: Update Compute HMC Firmware
+```bash
+nvfwupd -c compute_hmc.yaml update_fw
+```
+
+#### Step 5: Activate HMC Firmware (Auxiliary Power Cycle)
+```bash
+python aux_powercycle_compute.py
+```
+
+#### Step 6: Verify HMC Update Success
+```bash
+nvfwupd -c compute_hmc.yaml show_version | grep '^Displaying version info for\|^HGX_FW_BMC_0\|^HGX_FW_CPLD_0\|^HGX_FW_CPU_0\|^HGX_FW_CPU_1\|^HGX_FW_ERoT_BMC_0\|^HGX_FW_ERoT_CPU_0\|^HGX_FW_ERoT_CPU_1\|^HGX_FW_ERoT_FPGA_0\|^HGX_FW_ERoT_FPGA_1'
+```
+
+**All outputs should show:**
+```
+HGX_FW_BMC_0                             GB200Nvl-25.07-7               GB200Nvl-25.07-7               Yes
+HGX_FW_CPLD_0                            0.22                           0.22                           Yes
+HGX_FW_CPU_0                             02.04.07a                      02.04.12                       Yes
+HGX_FW_CPU_1                             02.04.07a                      02.04.12                       Yes
+HGX_FW_ERoT_BMC_0                        01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+HGX_FW_ERoT_CPU_0                        01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+HGX_FW_ERoT_CPU_1                        01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+HGX_FW_ERoT_FPGA_0                       01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+HGX_FW_ERoT_FPGA_1                       01.04.0031.0000_n04            01.04.0031.0000_n04            Yes
+```
+
+### 🔌 Switch Systems Firmware Update
+
+#### Step 1: Update Switch BMC Firmware
+```bash
+python nvsw_fw_update.py -p bmc
+```
+
+#### Step 2: Monitor Update Progress
+```bash
+python switch_redfish_status.py
+```
+- Monitor until all systems show `PercentComplete: 100%`.
+
+#### Step 3: Activate BMC Firmware (Power Cycle)
+```bash
+python powercycle_switch.py
+```
+
+
+#### Step 4: Verify Switch BMC Update Success
+```bash
+nvfwupd -c switch_bmc.yaml show_version | grep '^Displaying version info for\|^MGX_FW_BMC_0\|^MGX_FW_ERoT_BMC_\|^MGX_FW_ERoT_CPU_0\|^MGX_FW_ERoT_FPGA_0\|^MGX_FW_ERoT_NVSwitch_0\|^MGX_FW_ERoT_NVSwitch_1\|^MGX_FW_FPGA_0'
+```
+
+**Expected versions**:
+- `MGX_FW_BMC_0`: `88.0002.1950`
+- `MGX_FW_ERoT_*`: `01.04.0026.0000_n04`
+- `MGX_FW_FPGA_0`: `0.14`
+
+#### Step 5: Update Switch BIOS (If Needed)
+```bash
+python nvsw_fw_update.py -p bios
+```
+⚠️ **Note**: This step may be unnecessary if BIOS components are already included in the BMC package.
+
+#### Step 6: Update Switch CPLD (Manual Process)
+Due to Redfish API limitations with CPLD, manual installation via NVOS is required:
+
+1. **Extract CPLD firmware**:
+   ```bash
+   nvfwupd unpack -o cpld/ -p nvfw_GB300-P4093_0007_250629.1.0_prod-signed.fwpkg
+   ```
+
+2. **Install via NVOS** (on each switch):
+   ```bash
+   nv action fetch platform firmware CPLD1 scp://user@server/path/to/CPLD_file.bin
+   nv action install platform firmware CPLD1 files CPLD_file.bin
+   ```
+
+3. **Verify CPLD versions**:
+   ```bash
+   nv show platform firmware
+   ```
+
+### 🔍 Monitoring and Troubleshooting
+
+#### Monitor Task Progress
+- **Compute systems**: `python compute_redfish_status.py`
+- **Switch systems**: `python switch_redfish_status.py`
+
+#### Check Logs
+All operations log detailed information to `./logs/` directory:
+- `aux_powercycle_compute.log` - Auxiliary power cycle operations
+- `redfish_tasks.log` - Task monitoring and Redfish API responses
+- `switch_bmc.log` / `switch_bios.log` / `switch_cpld.log` - Firmware update operations
+
+#### Common Issues and Solutions
+
+**Authentication Failures**: BMC passwords may reset to `0penBmc` during some operations. Reset with:
+```bash
+ipmitool -I lanplus -H <ip_address> -U root -P '0penBmc' user set password 1 '<new_password>'
+```
+
+**Firmware Activation Issues**: If firmware shows "PendingActivation" status:
+- For compute systems: Use auxiliary power cycle (`python aux_powercycle_compute.py`)
+    - If you have trouble getting some HMC firmware to activate, you can status with `curl -s -k -u root:'<pw>' -X GET https://<bmc_ip>/redfish/v1/UpdateService/FirmwareInventory/HGX_FW_BMC_0`
+- For switch systems: Use system power cycle (`python powercycle_switch.py`)
+
+**Sequential Updates**: If parallel updates fail, use sequential processing:
+```bash
+python compute_hmc_sequential.py
+```
+
+### ✅ Verification Commands Summary
+
+| Component | Verification Command |
+|-----------|---------------------|
+| Compute BMC | `nvfwupd -c compute_bmc.yaml show_version \| grep ERoT_BMC_0` |
+| Compute HMC | `nvfwupd -c compute_hmc.yaml show_version \| grep HGX_FW` |
+| Switch BMC | `nvfwupd -c switch_bmc.yaml show_version \| grep MGX_FW` |
+| Switch CPLD | `nv show platform firmware` (on switch) |
+
 ## 📁 Project Structure
 
 ```
