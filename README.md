@@ -159,10 +159,16 @@ python powercycle_switch.py
 nvfwupd -c switch_bmc.yaml show_version | grep '^Displaying version info for\|^MGX_FW_BMC_0\|^MGX_FW_ERoT_BMC_\|^MGX_FW_ERoT_CPU_0\|^MGX_FW_ERoT_FPGA_0\|^MGX_FW_ERoT_NVSwitch_0\|^MGX_FW_ERoT_NVSwitch_1\|^MGX_FW_FPGA_0'
 ```
 
-**Expected versions**:
-- `MGX_FW_BMC_0`: `88.0002.1950`
-- `MGX_FW_ERoT_*`: `01.04.0026.0000_n04`
-- `MGX_FW_FPGA_0`: `0.14`
+**All outputs should show:**
+```
+MGX_FW_BMC_0                             88.0002.1950                   88.0002.1950                   Yes
+MGX_FW_ERoT_BMC_0                        01.04.0026.0000_n04            01.04.0026.0000_n04            Yes
+MGX_FW_ERoT_CPU_0                        01.04.0026.0000_n04            01.04.0026.0000_n04            Yes
+MGX_FW_ERoT_FPGA_0                       01.04.0026.0000_n04            01.04.0026.0000_n04            Yes
+MGX_FW_ERoT_NVSwitch_0                   01.04.0026.0000_n04            01.04.0026.0000_n04            Yes
+MGX_FW_ERoT_NVSwitch_1                   01.04.0026.0000_n04            01.04.0026.0000_n04            Yes
+MGX_FW_FPGA_0                            0.14                           0.14                           Yes
+```
 
 #### Step 5: Update Switch BIOS (If Needed)
 ```bash
